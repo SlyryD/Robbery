@@ -132,7 +132,7 @@ public class CardGame : MonoBehaviour
         }
         else if (Input.GetKeyDown(KeyCode.F2))
         {
-            OnDrawCards();
+            StartCoroutine(OnDrawCards());
         }
         else if (Input.GetKeyDown(KeyCode.F3))
         {
@@ -289,8 +289,7 @@ public class CardGame : MonoBehaviour
         if (cards1.Remove(card))
         {
             cards2.Add(card);
-            // TODO: Add animation
-            card.transform.position = dest;
+            StartCoroutine(MoveCard(card, card.transform.position, dest));
         }
         else
         {
@@ -424,6 +423,12 @@ public class CardGame : MonoBehaviour
         }
     }
 
+    IEnumerator MoveCard(Card card, Vector3 source, Vector3 dest)
+    {
+        card.SetFlyTarget(source, dest, FlyTime, true);
+        yield return new WaitForSeconds(FlyTime);
+    }
+
     static int GetScore(List<Card> cards)
     {
         int score = 0;
@@ -513,16 +518,18 @@ public class CardGame : MonoBehaviour
         }
     }
 
-    void OnDrawCards()
+    IEnumerator OnDrawCards()
     {
         Debug.Log("OnDrawCards");
         if (m_state == GameState.PlayerTurn)
         {
             DrawPlayer();
+            yield return new WaitForSeconds(DealTime);
         }
         else if (m_state == GameState.DealerTurn)
         {
             DrawDealer();
+            yield return new WaitForSeconds(DealTime);
         }
     }
 
@@ -574,7 +581,7 @@ public class CardGame : MonoBehaviour
                 StartCoroutine(OnReset());
                 break;
             case "Draw":
-                OnDrawCards();
+                StartCoroutine(OnDrawCards());
                 break;
             case "Stop":
                 OnStop();
