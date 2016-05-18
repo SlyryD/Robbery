@@ -44,6 +44,8 @@ public class CardGame : MonoBehaviour
 
     // Audio source for music
     AudioSource music;
+    bool load;
+    int numUpdates;
 
     enum GameState
     {
@@ -101,6 +103,8 @@ public class CardGame : MonoBehaviour
         music.loop = true;
         music.clip = ThoughtLoop;
         music.Play();
+        load = false;
+        numUpdates = 0;
 
         // Deal cards to start game
         StartCoroutine(OnReset());
@@ -161,6 +165,23 @@ public class CardGame : MonoBehaviour
             OnStop();
         }
         //UpdateButtons();
+    }
+
+    void LateUpdate()
+    {
+        // Eventually load credits
+        if (load)
+        {
+            if (numUpdates < 500)
+            {
+                numUpdates++;
+            }
+            else
+            {
+                load = false;
+                UnityEngine.SceneManagement.SceneManager.LoadScene("Credits");
+            }
+        }
     }
 
     void Shuffle()
@@ -495,9 +516,11 @@ public class CardGame : MonoBehaviour
 
                         // Tidy up board afterwards
                         Tidy();
+                        yield return new WaitForSeconds(DealTime);
                         yield return StartCoroutine(Draw());
 
                         // Loot again
+                        yield return new WaitForSeconds(DealTime);
                         yield return StartCoroutine(Loot(null, null));
                     }
                     else
@@ -561,14 +584,17 @@ public class CardGame : MonoBehaviour
 
                         // Tidy up board afterwards
                         Tidy();
+                        yield return new WaitForSeconds(DealTime);
                         yield return StartCoroutine(Draw());
 
                         // Loot again
+                        yield return new WaitForSeconds(DealTime);
                         yield return StartCoroutine(Loot(null, null));
                     }
                     else
                     {
                         Debug.Log("Dealer discarding");
+                        yield return new WaitForSeconds(DealTime);
                         yield return StartCoroutine(Discard());
                     }
                 }
@@ -576,6 +602,7 @@ public class CardGame : MonoBehaviour
             else
             {
                 Debug.Log("Dealer discarding");
+                yield return new WaitForSeconds(DealTime);
                 yield return StartCoroutine(Discard());
             }
         }
@@ -609,7 +636,7 @@ public class CardGame : MonoBehaviour
             Vector3 source = c.transform.position;
             Vector3 target = (Vector3)method.DynamicInvoke();
             Vector3 distance = source - target;
-            if (distance.magnitude >= 0.1f)
+            if (distance.magnitude > 0.1f)
             {
                 c.SetFlyTarget(source, target, FlyTime, true);
             }
@@ -669,6 +696,7 @@ public class CardGame : MonoBehaviour
                 yield return StartCoroutine(ShowAndFade(DealerTurnText));
                 m_state = GameState.DealerTurn;
                 yield return StartCoroutine(Draw());
+                yield return new WaitForSeconds(DealTime);
                 yield return StartCoroutine(Loot(null, null));
             }
         }
@@ -783,26 +811,28 @@ public class CardGame : MonoBehaviour
         }
     }
 
-    bool TryFinalize(int playerScore, int dealerScore)
+    void TryFinalize(int playerScore, int dealerScore)
     {
-        TextMesh mesh = ScoreText.GetComponent<TextMesh>();
+        // Play end music
         music.Stop();
         music.clip = ThoughtEnd;
         music.loop = false;
         music.Play();
+        load = true;
+
+        // Show score
+        TextMesh mesh = ScoreText.GetComponent<TextMesh>();
         if (dealerScore > playerScore)
         {
             mesh.text = String.Format(mesh.text, dealerScore, playerScore);
             ShowMessage("Dealer");
             m_state = GameState.DealerWins;
-            return true;
         }
         else if (dealerScore < playerScore)
         {
             mesh.text = String.Format(mesh.text, playerScore, dealerScore);
             ShowMessage("Player");
             m_state = GameState.PlayerWins;
-            return true;
         }
         else
         {
@@ -810,7 +840,6 @@ public class CardGame : MonoBehaviour
             mesh.text = String.Format(mesh.text, playerScore, dealerScore);
             ShowMessage("Nobody");
             m_state = GameState.NobodyWins;
-            return true;
         }
     }
 
