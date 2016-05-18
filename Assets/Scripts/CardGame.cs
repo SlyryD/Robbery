@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
+using System;
 
 public class CardGame : MonoBehaviour
 {
@@ -18,13 +19,15 @@ public class CardGame : MonoBehaviour
     List<Card> m_dealerVault = new List<Card>();
     List<Card> m_playerVault = new List<Card>();
 
-    // Get discard plane
+    // Get deck and discard planes
+    GameObject DeckPlane;
     GameObject DiscardPlane;
 
     // Win messages
     GameObject PlayerWins;
     GameObject DealerWins;
     GameObject NobodyWins;
+    GameObject ScoreText;
 
     // Num cards
     GameObject PlayerNumCards;
@@ -59,6 +62,8 @@ public class CardGame : MonoBehaviour
         Deck.Initialize();
 
         // Setup discard plane
+        DeckPlane = this.transform.Find("Deck-Plane").gameObject;
+        DeckPlane.SetActive(true);
         DiscardPlane = this.transform.Find("Discard-Plane").gameObject;
         DiscardPlane.SetActive(false);
 
@@ -66,9 +71,11 @@ public class CardGame : MonoBehaviour
         PlayerWins = this.transform.Find("MessagePlayerWins").gameObject;
         DealerWins = this.transform.Find("MessageDealerWins").gameObject;
         NobodyWins = this.transform.Find("MessageTie").gameObject;
+        ScoreText = this.transform.Find("Score").gameObject;
         PlayerWins.SetActive(false);
         DealerWins.SetActive(false);
         NobodyWins.SetActive(false);
+        ScoreText.SetActive(false);
 
         //Buttons = new GameObject[3];
         //Buttons[0] = this.transform.Find("Button1").gameObject;
@@ -106,24 +113,28 @@ public class CardGame : MonoBehaviour
             PlayerWins.SetActive(false);
             DealerWins.SetActive(true);
             NobodyWins.SetActive(false);
+            ScoreText.SetActive(true);
         }
         else if (msg == "Player")
         {
             PlayerWins.SetActive(true);
             DealerWins.SetActive(false);
             NobodyWins.SetActive(false);
+            ScoreText.SetActive(true);
         }
         else if (msg == "Nobody")
         {
             PlayerWins.SetActive(false);
             DealerWins.SetActive(false);
             NobodyWins.SetActive(true);
+            ScoreText.SetActive(true);
         }
         else
         {
             PlayerWins.SetActive(false);
             DealerWins.SetActive(false);
             NobodyWins.SetActive(false);
+            ScoreText.SetActive(false);
         }
     }
 
@@ -181,16 +192,24 @@ public class CardGame : MonoBehaviour
 
     Vector3 GetNextBoardPosition()
     {
-        float x = -3 + (m_boardCards.Count) * 2.5f;
-        float y = 0;
+        float x = -3f;
+        float y = 0f;
         float z = (m_boardCards.Count) * -0.1f;
+        if (m_boardCards.Count > 5)
+        {
+            x += (m_boardCards.Count) * 2.5f;
+        }
+        else
+        {
+            x += (m_boardCards.Count) * 2.5f;
+        }
         return new Vector3(x, y, z);
     }
 
     Vector3 GetNextDealerPosition()
     {
-        float x = -3 + (m_dealerHand.Count) * 1.5f;
-        float y = 10;
+        float x = -3f;
+        float y = 10f;
         float z = 5f;
         return new Vector3(x, y, z);
     }
@@ -198,15 +217,15 @@ public class CardGame : MonoBehaviour
     Vector3 GetNextPlayerPosition()
     {
         float x = -3 + (m_playerHand.Count) * 2.5f;
-        float y = -10;
+        float y = -10f;
         float z = (m_playerHand.Count) * -0.1f;
         return new Vector3(x, y, z);
     }
 
     Vector3 GetNextDealerVaultPosition()
     {
-        float x = 0;
-        float y = 5;
+        float x = 0f;
+        float y = 4.5f;
         float z = (m_playerVault.Count) * -0.1f;
         return new Vector3(x, y, z);
     }
@@ -219,7 +238,7 @@ public class CardGame : MonoBehaviour
         return new Vector3(x, y, z);
     }
 
-    bool DrawHelper(List<Card> player, Vector3 position)
+    bool DrawHelper(List<Card> player, Vector3 position, bool noFlip = false)
     {
         CardDef c1 = Deck.Pop();
         if (c1 != null)
@@ -237,6 +256,7 @@ public class CardGame : MonoBehaviour
             newCard.SetFlyTarget(deckPos, position, FlyTime);
             return true;
         }
+        DeckPlane.SetActive(false);
         return false;
     }
 
@@ -336,7 +356,7 @@ public class CardGame : MonoBehaviour
         {
             if (!dealerDone)
             {
-                int cardIdx = Random.Range(0, m_dealerHand.Count);
+                int cardIdx = UnityEngine.Random.Range(0, m_dealerHand.Count);
                 Card card = m_dealerHand[cardIdx];
                 DiscardHelper(m_dealerHand, card);
                 AdjustCount(DealerNumCards, -1);
@@ -395,6 +415,9 @@ public class CardGame : MonoBehaviour
         if (m_state == GameState.PlayerTurn)
         {
             List<Card> handCards = GetClickedCards(m_playerHand);
+            Debug.Log(String.Format("{0} cards to loot", lootCards.Count));
+            Debug.Log(String.Format("{0} hand cards to loot with", handCards.Count));
+            Debug.Log(String.Format("They are the same value: {0}", SameValue(handCards[0], lootCards[0])));
             if (handCards.Count > 0 && SameValue(handCards[0], lootCards[0]))
             {
                 foreach (Card c in lootCards)
@@ -410,6 +433,10 @@ public class CardGame : MonoBehaviour
                 yield return new WaitForSeconds(DealTime);
                 Tidy();
                 yield return Draw();
+            }
+            if (m_playerHand.Count <= 0)
+            {
+                yield return Discard();
             }
         }
         else if (m_state == GameState.DealerTurn)
@@ -554,35 +581,34 @@ public class CardGame : MonoBehaviour
     void Tidy()
     {
         // Board cards
-        Card[] temp = new Card[m_boardCards.Count];
-        m_boardCards.CopyTo(temp);
-        m_boardCards.Clear();
-        foreach (Card c in temp)
-        {
-            Vector3 source = c.transform.position;
-            Vector3 target = GetNextBoardPosition();
-            Vector3 distance = source - target;
-            if (distance.magnitude >= 0.1f)
-            {
-                c.SetFlyTarget(source, target, FlyTime, true);
-            }
-            m_boardCards.Add(c);
-        }
+        Tidy(m_boardCards, new Func<Vector3>(GetNextBoardPosition));
 
         // Player hand cards
-        temp = new Card[m_playerHand.Count];
-        m_playerHand.CopyTo(temp);
-        m_playerHand.Clear();
+        Tidy(m_playerHand, new Func<Vector3>(GetNextPlayerPosition));
+
+        // Player vault
+        Tidy(m_playerVault, new Func<Vector3>(GetNextPlayerVaultPosition));
+
+        // Dealer vault
+        Tidy(m_dealerVault, new Func<Vector3>(GetNextDealerVaultPosition));
+    }
+
+    void Tidy(List<Card> cards, Delegate method)
+    {
+        // Board cards
+        Card[] temp = new Card[cards.Count];
+        cards.CopyTo(temp);
+        cards.Clear();
         foreach (Card c in temp)
         {
             Vector3 source = c.transform.position;
-            Vector3 target = GetNextPlayerPosition();
+            Vector3 target = (Vector3)method.DynamicInvoke();
             Vector3 distance = source - target;
             if (distance.magnitude >= 0.1f)
             {
                 c.SetFlyTarget(source, target, FlyTime, true);
             }
-            m_playerHand.Add(c);
+            cards.Add(c);
         }
     }
 
@@ -614,18 +640,32 @@ public class CardGame : MonoBehaviour
 
         if (m_state == GameState.PlayerTurn)
         {
-            m_state = GameState.ShowingText;
-            yield return StartCoroutine(ShowAndFade(PlayerTurnText));
-            m_state = GameState.PlayerTurn;
-            yield return Draw();
+            if (m_playerHand.Count <= 0)
+            {
+                yield return Discard();
+            }
+            else
+            {
+                m_state = GameState.ShowingText;
+                yield return StartCoroutine(ShowAndFade(PlayerTurnText));
+                m_state = GameState.PlayerTurn;
+                yield return Draw();
+            }
         }
         else if (m_state == GameState.DealerTurn)
         {
-            m_state = GameState.ShowingText;
-            yield return StartCoroutine(ShowAndFade(DealerTurnText));
-            m_state = GameState.DealerTurn;
-            yield return Draw();
-            yield return StartCoroutine(Loot(null, null));
+            if (m_dealerHand.Count <= 0)
+            {
+                yield return Discard();
+            }
+            else
+            {
+                m_state = GameState.ShowingText;
+                yield return StartCoroutine(ShowAndFade(DealerTurnText));
+                m_state = GameState.DealerTurn;
+                yield return Draw();
+                yield return StartCoroutine(Loot(null, null));
+            }
         }
     }
 
@@ -709,7 +749,7 @@ public class CardGame : MonoBehaviour
 
             // Randomly choose player's turn
             //m_state = GameState.PlayerTurn;
-            if (Random.value >= 0.5f)
+            if (UnityEngine.Random.value >= 0.5f)
             {
                 m_state = GameState.PlayerTurn;
             }
@@ -740,14 +780,17 @@ public class CardGame : MonoBehaviour
 
     bool TryFinalize(int playerScore, int dealerScore)
     {
+        TextMesh mesh = ScoreText.GetComponent<TextMesh>();
         if (dealerScore > playerScore)
         {
+            mesh.text = String.Format(mesh.text, dealerScore, playerScore);
             ShowMessage("Dealer");
             m_state = GameState.DealerWins;
             return true;
         }
         else if (dealerScore < playerScore)
         {
+            mesh.text = String.Format(mesh.text, playerScore, dealerScore);
             ShowMessage("Player");
             m_state = GameState.PlayerWins;
             return true;
@@ -755,6 +798,7 @@ public class CardGame : MonoBehaviour
         else
         {
             // Nobody Wins!
+            mesh.text = String.Format(mesh.text, playerScore, dealerScore);
             ShowMessage("Nobody");
             m_state = GameState.NobodyWins;
             return true;
@@ -889,9 +933,11 @@ public class CardGame : MonoBehaviour
             {
                 Debug.Log("Attempting to loot dealer\'s vault...");
                 List<Card> handCards = GetClickedCards(m_playerHand);
+                Debug.Log(string.Format("{0} relevant cards in hand", handCards.Count));
                 if (handCards.Count > 0)
                 {
                     List<Card> vaultCards = GetTopCards(m_dealerVault);
+                    Debug.Log(string.Format("{0} relevant cards in vault", vaultCards.Count));
                     StartCoroutine(Loot(vaultCards, m_dealerVault));
                 }
             }
