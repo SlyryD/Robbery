@@ -347,7 +347,7 @@ public class CardGame : MonoBehaviour
             Debug.Log("Switching from dealer to player");
             m_state = GameState.PlayerTurn;
         }
-        BeginTurn();
+        yield return StartCoroutine(BeginTurn());
     }
 
     bool SameValue(Card c1, Card c2)
@@ -466,7 +466,7 @@ public class CardGame : MonoBehaviour
                         yield return Draw();
 
                         // Loot again
-                        Loot(null, null);
+                        yield return Loot(null, null);
                     }
                     else
                     {
@@ -532,7 +532,7 @@ public class CardGame : MonoBehaviour
                         yield return Draw();
 
                         // Loot again
-                        Loot(null, null);
+                        yield return Loot(null, null);
                     }
                     else
                     {
@@ -625,7 +625,7 @@ public class CardGame : MonoBehaviour
             yield return StartCoroutine(ShowAndFade(DealerTurnText));
             m_state = GameState.DealerTurn;
             yield return Draw();
-            StartCoroutine(Loot(null, null));
+            yield return StartCoroutine(Loot(null, null));
         }
     }
 
@@ -719,7 +719,7 @@ public class CardGame : MonoBehaviour
             }
 
             // Begin turn
-            StartCoroutine(BeginTurn());
+            yield return StartCoroutine(BeginTurn());
         }
     }
 
@@ -885,7 +885,7 @@ public class CardGame : MonoBehaviour
                 }
             }
             // When player clicks on a card on the board
-            else if (m_playerVault.Contains(card))
+            else if (m_dealerVault.Contains(card))
             {
                 Debug.Log("Attempting to loot dealer\'s vault...");
                 List<Card> handCards = GetClickedCards(m_playerHand);
