@@ -5,6 +5,9 @@ using System.Collections.Generic;
 
 public class CardGame : MonoBehaviour
 {
+    // Deck dealing time
+    const float DealTime = 0.35f;
+
     // Deck of cards
     public CardDeck Deck;
 
@@ -42,6 +45,7 @@ public class CardGame : MonoBehaviour
         NobodyWins,
         DealerTurn,
         PlayerTurn,
+        ShowingText,
     };
 
     GameState m_state;
@@ -277,7 +281,7 @@ public class CardGame : MonoBehaviour
         }
         else if (m_state == GameState.DealerTurn)
         {
-            while (m_playerHand.Count < 5 && DrawDealer())
+            while (m_dealerHand.Count < 5 && DrawDealer())
             {
                 yield return new WaitForSeconds(DealTime);
             }
@@ -304,40 +308,98 @@ public class CardGame : MonoBehaviour
 
     IEnumerator Discard()
     {
+        // Check if game is over
+        bool playerDone = (m_playerHand.Count <= 0);
+        bool dealerDone = (m_dealerHand.Count <= 0);
+        if (playerDone && dealerDone)
+        {
+            OnStop();
+        }
+
+        // Otherwise discard and switch turns
         if (m_state == GameState.PlayerTurn)
         {
-            List<Card> cards = GetClickedCards(m_playerHand);
-            DiscardHelper(m_playerHand, cards[0]);
-            DiscardPlane.SetActive(false);
-            AdjustCount(PlayerNumCards, -1);
-            yield return new WaitForSeconds(DealTime);
-            Tidy();
-            yield return new WaitForSeconds(DealTime);
-            //m_state = GameState.DealerTurn;
+            if (!playerDone)
+            {
+                List<Card> cards = GetClickedCards(m_playerHand);
+                DiscardHelper(m_playerHand, cards[0]);
+                DiscardPlane.SetActive(false);
+                AdjustCount(PlayerNumCards, -1);
+                yield return new WaitForSeconds(DealTime);
+                Tidy();
+                yield return new WaitForSeconds(DealTime);
+            }
+            Debug.Log("Switching from player to dealer");
+            m_state = GameState.DealerTurn;
         }
         else if (m_state == GameState.DealerTurn)
         {
-            // TODO: Implement
-            //DiscardHelper(m_dealerHand, card);
-            yield return new WaitForSeconds(DealTime);
+            if (!dealerDone)
+            {
+                int cardIdx = Random.Range(0, m_dealerHand.Count);
+                Card card = m_dealerHand[cardIdx];
+                DiscardHelper(m_dealerHand, card);
+                AdjustCount(DealerNumCards, -1);
+                yield return new WaitForSeconds(DealTime);
+                Tidy();
+                yield return new WaitForSeconds(DealTime);
+            }
+            Debug.Log("Switching from dealer to player");
+            m_state = GameState.PlayerTurn;
         }
+        BeginTurn();
     }
 
     bool SameValue(Card c1, Card c2)
     {
+        if (c1 == null || c2 == null)
+        {
+            return false;
+        }
         return string.Compare(c1.Definition.Text, c2.Definition.Text) == 0;
     }
 
-    IEnumerator Loot(List<Card> boardCards)
+    List<Card> GetTopCards(List<Card> cards)
+    {
+        List<Card> topCards = new List<Card>();
+        Card topCard = GetLastCard(cards);
+        if (topCard != null)
+        {
+            for (int i = cards.Count - 1; i >= 0; i--)
+            {
+                Card nextCard = cards[i];
+                if (SameValue(nextCard, topCard))
+                {
+                    topCards.Add(nextCard);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+        return topCards;
+    }
+
+    Card GetLastCard(List<Card> cards)
+    {
+        if (cards.Count > 0)
+        {
+            return cards[cards.Count - 1];
+        }
+        return null;
+    }
+
+    IEnumerator Loot(List<Card> lootCards, List<Card> source)
     {
         if (m_state == GameState.PlayerTurn)
         {
             List<Card> handCards = GetClickedCards(m_playerHand);
-            if (handCards.Count > 0 && SameValue(handCards[0], boardCards[0]))
+            if (handCards.Count > 0 && SameValue(handCards[0], lootCards[0]))
             {
-                foreach (Card c in boardCards)
+                foreach (Card c in lootCards)
                 {
-                    TransferCard(c, m_boardCards, m_playerVault, GetNextPlayerVaultPosition());
+                    TransferCard(c, source, m_playerVault, GetNextPlayerVaultPosition());
                 }
                 foreach (Card c in handCards)
                 {
@@ -349,13 +411,141 @@ public class CardGame : MonoBehaviour
                 Tidy();
                 yield return Draw();
             }
-            //m_state = GameState.DealerTurn;
         }
         else if (m_state == GameState.DealerTurn)
         {
-            // TODO: Implement
-            //DiscardHelper(m_dealerHand, card);
-            yield return new WaitForSeconds(DealTime);
+            Debug.Log("Begin dealer loot phase...");
+            // Cards in hand?
+            if (m_dealerHand.Count > 0)
+            {
+                Debug.Log(string.Format("Cards in dealer\'s hand = {0}", m_dealerHand.Count));
+                bool failedLoot = false;
+                if (m_playerVault.Count > 0)
+                {
+                    Debug.Log(string.Format("Cards in player\'s vault = {0}", m_playerVault.Count));
+                    // Try looting player vault
+                    List<Card> handCards = new List<Card>();
+                    Card cardToLoot = GetLastCard(m_playerVault);
+                    foreach (Card handCard in m_dealerHand)
+                    {
+                        if (SameValue(cardToLoot, handCard))
+                        {
+                            handCards.Add(handCard);
+                        }
+                    }
+
+                    // Looting...
+                    Debug.Log(string.Format("Plan to loot {0} cards", handCards.Count));
+                    if (handCards.Count > 0)
+                    {
+                        Debug.Log(string.Format("Looting with {0} hand cards", handCards.Count));
+                        // TODO: Insert looting animation here
+
+                        // Transfer first card
+                        TransferCard(cardToLoot, m_playerVault, m_dealerVault, GetNextDealerVaultPosition());
+
+                        // Look for more
+                        Card nextCard = GetLastCard(m_playerVault);
+                        while (nextCard != null && SameValue(cardToLoot, nextCard))
+                        {
+                            TransferCard(nextCard, m_playerVault, m_dealerVault, GetNextDealerVaultPosition());
+                            nextCard = GetLastCard(m_playerVault);
+                        }
+
+                        // Transfer hand cards to dealer vault
+                        foreach (Card handCard in handCards)
+                        {
+                            TransferCard(handCard, m_dealerHand, m_dealerVault, GetNextDealerVaultPosition());
+                        }
+
+                        // Decrement hand count
+                        AdjustCount(DealerNumCards, -handCards.Count);
+
+                        // Tidy up board afterwards
+                        Tidy();
+                        yield return Draw();
+
+                        // Loot again
+                        Loot(null, null);
+                    }
+                    else
+                    {
+                        failedLoot = true;
+                    }
+                }
+
+                // Try looting board
+                if (m_playerVault.Count <= 0 || failedLoot)
+                {
+                    Debug.Log("Attempting to loot board...");
+                    List<Card> handCards = new List<Card>();
+                    List<Card> cardsToLoot = new List<Card>();
+                    Card foundCard = null;
+
+                    // Look through hand cards
+                    foreach (Card handCard in m_dealerHand)
+                    {
+                        if (foundCard == null)
+                        {
+                            // Find matching board cards and add to list
+                            foreach (Card cardToLoot in m_boardCards)
+                            {
+                                if (SameValue(handCard, cardToLoot))
+                                {
+                                    foundCard = handCard;
+                                    cardsToLoot.Add(cardToLoot);
+                                }
+                            }
+                        }
+
+                        // Add matching hand cards to list
+                        if (foundCard != null)
+                        {
+                            if (SameValue(handCard, foundCard))
+                            {
+                                handCards.Add(handCard);
+                            }
+                        }
+                    }
+
+                    // Loot board
+                    if (handCards.Count > 0 && cardsToLoot.Count > 0)
+                    {
+                        Debug.Log(string.Format("Looting board with {0} hand cards", handCards.Count));
+                        // Put board cards in vault
+                        foreach (Card cardToLoot in cardsToLoot)
+                        {
+                            TransferCard(cardToLoot, m_boardCards, m_dealerVault, GetNextDealerVaultPosition());
+                        }
+
+                        // Put hand cards in vault
+                        foreach (Card handCard in handCards)
+                        {
+                            TransferCard(handCard, m_dealerHand, m_dealerVault, GetNextDealerVaultPosition());
+                        }
+
+                        // Decrement hand count
+                        AdjustCount(DealerNumCards, -handCards.Count);
+
+                        // Tidy up board afterwards
+                        Tidy();
+                        yield return Draw();
+
+                        // Loot again
+                        Loot(null, null);
+                    }
+                    else
+                    {
+                        Debug.Log("Dealer discarding");
+                        yield return Discard();
+                    }
+                }
+            }
+            else
+            {
+                Debug.Log("Dealer discarding");
+                yield return Discard();
+            }
         }
     }
 
@@ -369,7 +559,13 @@ public class CardGame : MonoBehaviour
         m_boardCards.Clear();
         foreach (Card c in temp)
         {
-            c.transform.position = GetNextBoardPosition();
+            Vector3 source = c.transform.position;
+            Vector3 target = GetNextBoardPosition();
+            Vector3 distance = source - target;
+            if (distance.magnitude >= 0.1f)
+            {
+                c.SetFlyTarget(source, target, FlyTime, true);
+            }
             m_boardCards.Add(c);
         }
 
@@ -379,7 +575,13 @@ public class CardGame : MonoBehaviour
         m_playerHand.Clear();
         foreach (Card c in temp)
         {
-            c.transform.position = GetNextPlayerPosition();
+            Vector3 source = c.transform.position;
+            Vector3 target = GetNextPlayerPosition();
+            Vector3 distance = source - target;
+            if (distance.magnitude >= 0.1f)
+            {
+                c.SetFlyTarget(source, target, FlyTime, true);
+            }
             m_playerHand.Add(c);
         }
     }
@@ -412,14 +614,18 @@ public class CardGame : MonoBehaviour
 
         if (m_state == GameState.PlayerTurn)
         {
+            m_state = GameState.ShowingText;
             yield return StartCoroutine(ShowAndFade(PlayerTurnText));
+            m_state = GameState.PlayerTurn;
             yield return Draw();
         }
         else if (m_state == GameState.DealerTurn)
         {
-            yield return StartCoroutine(ShowAndFade(PlayerTurnText));
+            m_state = GameState.ShowingText;
+            yield return StartCoroutine(ShowAndFade(DealerTurnText));
+            m_state = GameState.DealerTurn;
             yield return Draw();
-            // TODO: Begin AI
+            StartCoroutine(Loot(null, null));
         }
     }
 
@@ -473,8 +679,6 @@ public class CardGame : MonoBehaviour
         return GetScore(m_playerVault);
     }
 
-    const float DealTime = 0.35f;
-
     IEnumerator OnReset()
     {
         if (m_state != GameState.Resolving)
@@ -504,14 +708,15 @@ public class CardGame : MonoBehaviour
             }
 
             // Randomly choose player's turn
-            m_state = GameState.PlayerTurn;
-            //if (Random.value >= 0.5f)
-            //{
-            //    m_state = GameState.PlayerTurn;
-            //} else
-            //{
-            //    m_state = GameState.DealerTurn;
-            //}
+            //m_state = GameState.PlayerTurn;
+            if (Random.value >= 0.5f)
+            {
+                m_state = GameState.PlayerTurn;
+            }
+            else
+            {
+                m_state = GameState.DealerTurn;
+            }
 
             // Begin turn
             StartCoroutine(BeginTurn());
@@ -658,7 +863,9 @@ public class CardGame : MonoBehaviour
                 int numClicked = GetClickedCards(m_playerHand).Count;
                 if (numClicked == 1)
                 {
-                    DiscardPlane.transform.position = GetNextBoardPosition();
+                    Vector3 position = GetNextBoardPosition();
+                    position.z = -0.1f;
+                    DiscardPlane.transform.position = position;
                     DiscardPlane.SetActive(true);
                 }
                 else
@@ -674,7 +881,18 @@ public class CardGame : MonoBehaviour
                 if (handCards.Count > 0)
                 {
                     List<Card> boardCards = new List<Card> { card };
-                    StartCoroutine(Loot(boardCards));
+                    StartCoroutine(Loot(boardCards, m_boardCards));
+                }
+            }
+            // When player clicks on a card on the board
+            else if (m_playerVault.Contains(card))
+            {
+                Debug.Log("Attempting to loot dealer\'s vault...");
+                List<Card> handCards = GetClickedCards(m_playerHand);
+                if (handCards.Count > 0)
+                {
+                    List<Card> vaultCards = GetTopCards(m_dealerVault);
+                    StartCoroutine(Loot(vaultCards, m_dealerVault));
                 }
             }
         }
