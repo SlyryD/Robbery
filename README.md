@@ -1,8 +1,7 @@
 # Robbery: A card game
 
 ## Downloads
-Download the original proposal here (https://www.dropbox.com/s/lje2j73hlx74a8c/Dorson_Proposal.pdf?dl=1)
-Download the executable in .zip format here (https://www.dropbox.com/s/s1fp2dyet0py2de/RobberyGame.zip?dl=1)
+Download the video here (https://www.dropbox.com/s/9vzt42ldblpozbj/RobberyVideo.mp4?dl=1). Download the executable in .zip format here (https://www.dropbox.com/s/s1fp2dyet0py2de/RobberyGame.zip?dl=1). Download the original proposal here (https://www.dropbox.com/s/lje2j73hlx74a8c/Dorson_Proposal.pdf?dl=1).
 
 ## Rules
 Robbery is a card game I learned via word of mouth. My friend, who taught the game to me 5 years ago, learned it from another friend who learned to play it in Pakistan. Playing the game is fairly easy. You start the game with 4 cards. On your turn, you draw from the deck so that you have 5 cards in your hand. If any of your hand cards have the same value as cards on the board or in the opponent's vault, then you can put all of those cards into your vault. You then draw so that you have 5 cards again and repeat. You may discard 1 card from your hand to end your turn. Once the deck runs out, you do not draw during your turn. The game ends once both players have no cards in their hands. You then count up your points: 5 points for cards with value 2-7, 10 points for cards with value 8-K, and 20 points for Aces.
