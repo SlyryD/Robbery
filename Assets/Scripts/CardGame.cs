@@ -172,7 +172,7 @@ public class CardGame : MonoBehaviour
         // Eventually load credits
         if (load)
         {
-            if (numUpdates < 500)
+            if (numUpdates < 750)
             {
                 numUpdates++;
             }
@@ -216,14 +216,14 @@ public class CardGame : MonoBehaviour
         mesh.text = (int.Parse(mesh.text) + val).ToString();
     }
 
-    Vector3 GetNextBoardPosition()
+    Vector3 GetNextBoardPosition(int numCards)
     {
         float x = -3f;
         float y = 0f;
         float z = (m_boardCards.Count) * -0.1f;
-        if (m_boardCards.Count > 5)
+        if (numCards > 5)
         {
-            x += (m_boardCards.Count) * 2.5f;
+            x += (m_boardCards.Count) * 12.5f / numCards;
         }
         else
         {
@@ -251,7 +251,7 @@ public class CardGame : MonoBehaviour
     Vector3 GetNextDealerVaultPosition()
     {
         float x = 0f;
-        float y = 4.5f;
+        float y = 4f;
         float z = (m_playerVault.Count) * -0.1f;
         return new Vector3(x, y, z);
     }
@@ -261,6 +261,22 @@ public class CardGame : MonoBehaviour
         float x = 0;
         float y = -5;
         float z = (m_playerVault.Count) * -0.1f;
+        return new Vector3(x, y, z);
+    }
+
+    Vector3 GetNextPlayerShowPosition(int numCards)
+    {
+        float x = -6f + (m_playerVault.Count * 15f / numCards);
+        float y = -7.5f;
+        float z = (m_playerVault.Count) * -0.1f;
+        return new Vector3(x, y, z);
+    }
+
+    Vector3 GetNextDealerShowPosition(int numCards)
+    {
+        float x = -6f + (m_dealerVault.Count * 15f / numCards);
+        float y = 4f;
+        float z = (m_dealerVault.Count) * -0.1f;
         return new Vector3(x, y, z);
     }
 
@@ -289,7 +305,7 @@ public class CardGame : MonoBehaviour
     void DealBoard()
     {
         Debug.Log("DealBoard");
-        DrawHelper(m_boardCards, GetNextBoardPosition());
+        DrawHelper(m_boardCards, GetNextBoardPosition(m_boardCards.Count + 1));
     }
 
     bool DrawDealer()
@@ -349,7 +365,7 @@ public class CardGame : MonoBehaviour
 
     void DiscardHelper(List<Card> cards, Card card)
     {
-        TransferCard(card, cards, m_boardCards, GetNextBoardPosition());
+        TransferCard(card, cards, m_boardCards, GetNextBoardPosition(m_boardCards.Count + 1));
     }
 
     IEnumerator Discard()
@@ -610,10 +626,19 @@ public class CardGame : MonoBehaviour
 
     /* END TURN ACTIONS */
 
+    void ShowVaultCards()
+    {
+        // Player vault cards
+        Tidy(m_playerVault, new Func<int, Vector3>(GetNextPlayerShowPosition), m_playerVault.Count);
+
+        // Dealer vault cards
+        Tidy(m_dealerVault, new Func<int, Vector3>(GetNextDealerShowPosition), m_dealerVault.Count);
+    }
+
     void Tidy()
     {
         // Board cards
-        Tidy(m_boardCards, new Func<Vector3>(GetNextBoardPosition));
+        Tidy(m_boardCards, new Func<int, Vector3>(GetNextBoardPosition), m_boardCards.Count);
 
         // Player hand cards
         Tidy(m_playerHand, new Func<Vector3>(GetNextPlayerPosition));
@@ -635,6 +660,25 @@ public class CardGame : MonoBehaviour
         {
             Vector3 source = c.transform.position;
             Vector3 target = (Vector3)method.DynamicInvoke();
+            Vector3 distance = source - target;
+            if (distance.magnitude > 0.1f)
+            {
+                c.SetFlyTarget(source, target, FlyTime, true);
+            }
+            cards.Add(c);
+        }
+    }
+
+    void Tidy(List<Card> cards, Delegate method, int numCards)
+    {
+        // Board cards
+        Card[] temp = new Card[cards.Count];
+        cards.CopyTo(temp);
+        cards.Clear();
+        foreach (Card c in temp)
+        {
+            Vector3 source = c.transform.position;
+            Vector3 target = (Vector3)method.DynamicInvoke(numCards);
             Vector3 distance = source - target;
             if (distance.magnitude > 0.1f)
             {
@@ -820,6 +864,9 @@ public class CardGame : MonoBehaviour
         music.Play();
         load = true;
 
+        // Show vault cards
+        ShowVaultCards();
+
         // Show score
         TextMesh mesh = ScoreText.GetComponent<TextMesh>();
         if (dealerScore > playerScore)
@@ -945,7 +992,7 @@ public class CardGame : MonoBehaviour
                 int numClicked = GetClickedCards(m_playerHand).Count;
                 if (numClicked == 1)
                 {
-                    Vector3 position = GetNextBoardPosition();
+                    Vector3 position = GetNextBoardPosition(m_boardCards.Count);
                     position.z = -0.1f;
                     DiscardPlane.transform.position = position;
                     DiscardPlane.SetActive(true);
