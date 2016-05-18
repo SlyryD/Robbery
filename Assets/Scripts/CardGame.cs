@@ -6,11 +6,16 @@ using System;
 
 public class CardGame : MonoBehaviour
 {
-    // Deck dealing time
-    const float DealTime = 0.35f;
+    // Audio clips
+    public AudioClip ThoughtLoop;
+    public AudioClip ThoughtEnd;
 
     // Deck of cards
     public CardDeck Deck;
+
+    // Deck dealing time
+    const float DealTime = 0.35f;
+    const float FlyTime = 0.5f;
 
     // Lists of cards
     List<Card> m_boardCards = new List<Card>();
@@ -37,6 +42,9 @@ public class CardGame : MonoBehaviour
     GameObject DealerTurnText;
     GameObject PlayerTurnText;
 
+    // Audio source for music
+    AudioSource music;
+
     enum GameState
     {
         Invalid,
@@ -52,8 +60,6 @@ public class CardGame : MonoBehaviour
     };
 
     GameState m_state;
-
-    //GameObject[] Buttons;
 
     // Use this for initialization
     void Start()
@@ -77,12 +83,6 @@ public class CardGame : MonoBehaviour
         NobodyWins.SetActive(false);
         ScoreText.SetActive(false);
 
-        //Buttons = new GameObject[3];
-        //Buttons[0] = this.transform.Find("Button1").gameObject;
-        //Buttons[1] = this.transform.Find("Button2").gameObject;
-        //Buttons[2] = this.transform.Find("Button3").gameObject;
-        //UpdateButtons();
-
         // Get number of cards
         DealerNumCards = this.transform.Find("DealerNumCards").gameObject;
         PlayerNumCards = this.transform.Find("PlayerNumCards").gameObject;
@@ -94,6 +94,13 @@ public class CardGame : MonoBehaviour
         PlayerTurnText = this.transform.Find("PlayerTurnText").gameObject;
         DealerTurnText.SetActive(false);
         PlayerTurnText.SetActive(false);
+
+        // Start music
+        // Audio source for music
+        music = this.GetComponent<AudioSource>();
+        music.loop = true;
+        music.clip = ThoughtLoop;
+        music.Play();
 
         // Deal cards to start game
         StartCoroutine(OnReset());
@@ -181,8 +188,6 @@ public class CardGame : MonoBehaviour
     {
         return new UnityEngine.Vector3(-6, 0, 0);
     }
-
-    const float FlyTime = 0.5f;
 
     void AdjustCount(GameObject CountText, int val)
     {
@@ -432,11 +437,11 @@ public class CardGame : MonoBehaviour
                 AdjustCount(PlayerNumCards, -handCards.Count);
                 yield return new WaitForSeconds(DealTime);
                 Tidy();
-                yield return Draw();
+                yield return StartCoroutine(Draw());
             }
             if (m_playerHand.Count <= 0)
             {
-                yield return Discard();
+                yield return StartCoroutine(Discard());
             }
         }
         else if (m_state == GameState.DealerTurn)
@@ -490,10 +495,10 @@ public class CardGame : MonoBehaviour
 
                         // Tidy up board afterwards
                         Tidy();
-                        yield return Draw();
+                        yield return StartCoroutine(Draw());
 
                         // Loot again
-                        yield return Loot(null, null);
+                        yield return StartCoroutine(Loot(null, null));
                     }
                     else
                     {
@@ -556,22 +561,22 @@ public class CardGame : MonoBehaviour
 
                         // Tidy up board afterwards
                         Tidy();
-                        yield return Draw();
+                        yield return StartCoroutine(Draw());
 
                         // Loot again
-                        yield return Loot(null, null);
+                        yield return StartCoroutine(Loot(null, null));
                     }
                     else
                     {
                         Debug.Log("Dealer discarding");
-                        yield return Discard();
+                        yield return StartCoroutine(Discard());
                     }
                 }
             }
             else
             {
                 Debug.Log("Dealer discarding");
-                yield return Discard();
+                yield return StartCoroutine(Discard());
             }
         }
     }
@@ -642,28 +647,28 @@ public class CardGame : MonoBehaviour
         {
             if (m_playerHand.Count <= 0)
             {
-                yield return Discard();
+                yield return StartCoroutine(Discard());
             }
             else
             {
                 m_state = GameState.ShowingText;
                 yield return StartCoroutine(ShowAndFade(PlayerTurnText));
                 m_state = GameState.PlayerTurn;
-                yield return Draw();
+                yield return StartCoroutine(Draw());
             }
         }
         else if (m_state == GameState.DealerTurn)
         {
             if (m_dealerHand.Count <= 0)
             {
-                yield return Discard();
+                yield return StartCoroutine(Discard());
             }
             else
             {
                 m_state = GameState.ShowingText;
                 yield return StartCoroutine(ShowAndFade(DealerTurnText));
                 m_state = GameState.DealerTurn;
-                yield return Draw();
+                yield return StartCoroutine(Draw());
                 yield return StartCoroutine(Loot(null, null));
             }
         }
@@ -781,6 +786,10 @@ public class CardGame : MonoBehaviour
     bool TryFinalize(int playerScore, int dealerScore)
     {
         TextMesh mesh = ScoreText.GetComponent<TextMesh>();
+        music.Stop();
+        music.clip = ThoughtEnd;
+        music.loop = false;
+        music.Play();
         if (dealerScore > playerScore)
         {
             mesh.text = String.Format(mesh.text, dealerScore, playerScore);
